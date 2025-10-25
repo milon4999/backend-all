@@ -85,6 +85,7 @@ app.use('/api/payments', dbHealthCheck, require('./routes/payments'));
 app.use('/api/analytics', dbHealthCheck, require('./routes/analytics'));
 app.use('/api/banners', dbHealthCheck, require('./routes/banners'));
 app.use('/api/upload', require('./routes/upload')); // Upload doesn't need DB check
+app.use('/api/settings', dbHealthCheck, require('./routes/settings'));
 
 // Health check
 app.get('/api/health', (req, res) => {
