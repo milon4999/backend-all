@@ -16,6 +16,15 @@ router.get('/public', async (req, res) => {
     const settings = await getOrCreateSettings();
     const payload = {
       social: settings.social || { facebookUrl: '', whatsappUrl: '' },
+      payments: {
+        stripeEnabled: settings.payments?.stripeEnabled || false,
+        codEnabled: settings.payments?.codEnabled || false,
+        paypalEnabled: settings.payments?.paypalEnabled || false,
+        bankEnabled: settings.payments?.bankEnabled || false,
+        localEnabled: settings.payments?.localEnabled || false,
+        socialEnabled: settings.payments?.socialEnabled || false,
+        stripePublicKey: settings.payments?.stripePublicKey || ''
+      },
       updatedAt: settings.updatedAt
     };
     res.json({ success: true, settings: payload });

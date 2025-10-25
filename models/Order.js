@@ -1,10 +1,20 @@
 const mongoose = require('mongoose');
 
+function generateOrderNumber() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const t = String(now.getTime()).slice(-6);
+  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return `ORD-${yyyy}${mm}${dd}-${t}${rand}`;
+}
+
 const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
     unique: true,
-    required: true
+    default: generateOrderNumber
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -47,7 +57,7 @@ const orderSchema = new mongoose.Schema({
   payment: {
     method: {
       type: String,
-      enum: ['card', 'paypal', 'stripe', 'cod'],
+      enum: ['card', 'stripe', 'paypal', 'cod', 'bank', 'local', 'social'],
       required: true
     },
     transactionId: String,
@@ -113,10 +123,9 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Generate order number
-orderSchema.pre('save', async function(next) {
+orderSchema.pre('validate', function(next) {
   if (!this.orderNumber) {
-    const count = await mongoose.model('Order').countDocuments();
-    this.orderNumber = `ORD-${Date.now()}-${count + 1}`;
+    this.orderNumber = generateOrderNumber();
   }
   next();
 });
