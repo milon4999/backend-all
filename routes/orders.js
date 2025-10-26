@@ -103,11 +103,12 @@ router.post('/', protect, async (req, res) => {
         variant: item.variant || ''
       });
 
-      // Update stock
+      // Update sales and stock
+      product.sales = (product.sales || 0) + item.quantity;
       if (product.inventory.trackInventory) {
         product.inventory.stock -= item.quantity;
-        await product.save();
       }
+      await product.save();
     }
 
     const shipping = req.body.pricing?.shipping || 0;

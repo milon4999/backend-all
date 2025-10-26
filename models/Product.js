@@ -99,6 +99,11 @@ const productSchema = new mongoose.Schema({
       default: 0
     }
   },
+  sales: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   featured: {
     type: Boolean,
     default: false
@@ -138,8 +143,14 @@ productSchema.pre('findOneAndUpdate', function(next) {
   if (hasTopLevel || $set.name !== undefined || $set.slug !== undefined) {
     const rawSlug = $set.slug !== undefined ? $set.slug : (update.slug !== undefined ? update.slug : undefined);
     const rawName = $set.name !== undefined ? $set.name : (update.name !== undefined ? update.name : undefined);
+    const slugProvidedButEmpty = (rawSlug === '' || rawSlug === null);
     const base = (rawSlug && String(rawSlug).trim()) || rawName;
-    if (base !== undefined) {
+    if (slugProvidedButEmpty) {
+      // Explicitly unset slug when null/empty provided
+      $unset.slug = '';
+      if ($set.slug !== undefined) delete $set.slug;
+      if (update.slug !== undefined) delete update.slug;
+    } else if (base !== undefined) {
       const s = makeSlug(base);
       if (s) {
         $set.slug = s;
@@ -157,7 +168,10 @@ productSchema.pre('findOneAndUpdate', function(next) {
   next();
 });
 
-productSchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $exists: true, $ne: '' } }, name: 'unique_slug_nonempty' });
+productSchema.index(
+  { slug: 1 },
+  { unique: true, partialFilterExpression: { slug: { $exists: true, $nin: ['', null] } }, name: 'unique_slug_nonempty' }
+);
 
 // Check if stock is low
 productSchema.virtual('isLowStock').get(function() {
