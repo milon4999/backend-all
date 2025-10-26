@@ -30,6 +30,7 @@ const orderSchema = new mongoose.Schema({
     name: String,
     image: String,
     price: Number,
+    currency: { type: String },
     quantity: {
       type: Number,
       required: true,
@@ -115,6 +116,10 @@ const orderSchema = new mongoose.Schema({
   notes: {
     customer: String,
     admin: String
+  },
+  currency: {
+    type: String,
+    default: 'USD'
   },
   deliveredAt: Date,
   cancelledAt: Date

@@ -18,7 +18,7 @@ router.get('/', protect, async (req, res) => {
 
     const orders = await Order.find(query)
       .populate('user', 'name email')
-      .populate('items.product', 'name images')
+      .populate('items.product', 'name images price currency')
       .sort('-createdAt')
       .limit(Number(limit))
       .skip(skip);
@@ -45,7 +45,7 @@ router.get('/:id', protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name images price');
+      .populate('items.product', 'name images price currency');
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
@@ -98,6 +98,7 @@ router.post('/', protect, async (req, res) => {
         name: product.name,
         image: product.images[0]?.url || '',
         price: product.price,
+        currency: product.currency,
         quantity: item.quantity,
         variant: item.variant || ''
       });
@@ -121,7 +122,8 @@ router.post('/', protect, async (req, res) => {
       billingAddress: billingAddress || shippingAddress,
       payment,
       pricing: { subtotal, shipping, tax, discount, total },
-      coupon
+      coupon,
+      currency: orderItems[0]?.currency || 'USD'
     });
 
     res.status(201).json({ success: true, order });
