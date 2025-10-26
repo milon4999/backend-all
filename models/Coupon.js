@@ -67,10 +67,15 @@ const couponSchema = new mongoose.Schema({
 // Check if coupon is valid
 couponSchema.methods.isValid = function() {
   const now = new Date();
+  const start = this.startDate ? new Date(this.startDate) : null;
+  const end = this.endDate ? new Date(this.endDate) : null;
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  // Make end date inclusive for the whole day
+  end.setHours(23, 59, 59, 999);
   return (
-    this.isActive &&
-    now >= this.startDate &&
-    now <= this.endDate &&
+    this.isActive === true &&
+    now >= start &&
+    now <= end &&
     (this.usageLimit === null || this.usedCount < this.usageLimit)
   );
 };
