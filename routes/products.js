@@ -116,6 +116,15 @@ router.post('/', protect, authorize('admin', 'editor'), async (req, res) => {
     const product = await Product.create(req.body);
     res.status(201).json({ success: true, product });
   } catch (error) {
+    if (error && error.code === 11000) {
+      const field = Object.keys(error.keyPattern || error.keyValue || {})[0] || 'field';
+      const message = field === 'slug'
+        ? 'A product with this slug already exists. Please change the name or slug.'
+        : field === 'inventory.sku' || field === 'sku'
+        ? 'This SKU is already in use. Please use a different SKU.'
+        : 'Duplicate value for a unique field.';
+      return res.status(400).json({ success: false, message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -136,6 +145,15 @@ router.put('/:id', protect, authorize('admin', 'editor'), async (req, res) => {
 
     res.json({ success: true, product });
   } catch (error) {
+    if (error && error.code === 11000) {
+      const field = Object.keys(error.keyPattern || error.keyValue || {})[0] || 'field';
+      const message = field === 'slug'
+        ? 'A product with this slug already exists. Please change the name or slug.'
+        : field === 'inventory.sku' || field === 'sku'
+        ? 'This SKU is already in use. Please use a different SKU.'
+        : 'Duplicate value for a unique field.';
+      return res.status(400).json({ success: false, message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });

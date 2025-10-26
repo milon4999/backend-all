@@ -8,8 +8,9 @@ const productSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,
-    lowercase: true
+    lowercase: true,
+    trim: true,
+    default: undefined
   },
   description: {
     type: String,
@@ -114,16 +115,49 @@ const productSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create slug from name
+const makeSlug = (val) => {
+  const s = String(val || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return s;
+};
+
 productSchema.pre('save', function(next) {
-  if (this.isModified('name')) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  const provided = this.slug && String(this.slug).trim();
+  if (!provided || this.isModified('name')) {
+    const base = provided || this.name;
+    const s = makeSlug(base);
+    this.slug = s || undefined;
   }
   next();
 });
+
+productSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate() || {};
+  const hasTopLevel = Object.prototype.hasOwnProperty.call(update, 'name') || Object.prototype.hasOwnProperty.call(update, 'slug');
+  const $set = update.$set || {};
+  const $unset = update.$unset || {};
+  if (hasTopLevel || $set.name !== undefined || $set.slug !== undefined) {
+    const rawSlug = $set.slug !== undefined ? $set.slug : (update.slug !== undefined ? update.slug : undefined);
+    const rawName = $set.name !== undefined ? $set.name : (update.name !== undefined ? update.name : undefined);
+    const base = (rawSlug && String(rawSlug).trim()) || rawName;
+    if (base !== undefined) {
+      const s = makeSlug(base);
+      if (s) {
+        $set.slug = s;
+        if (update.slug !== undefined) delete update.slug;
+      } else {
+        $unset.slug = '';
+        if ($set.slug !== undefined) delete $set.slug;
+        if (update.slug !== undefined) delete update.slug;
+      }
+    }
+  }
+  if (Object.keys($set).length) update.$set = $set; else delete update.$set;
+  if (Object.keys($unset).length) update.$unset = $unset; else delete update.$unset;
+  this.setUpdate(update);
+  next();
+});
+
+productSchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $exists: true, $ne: '' } }, name: 'unique_slug_nonempty' });
 
 // Check if stock is low
 productSchema.virtual('isLowStock').get(function() {
