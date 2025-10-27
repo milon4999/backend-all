@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -86,6 +87,9 @@ app.use('/api/analytics', dbHealthCheck, require('./routes/analytics'));
 app.use('/api/banners', dbHealthCheck, require('./routes/banners'));
 app.use('/api/upload', require('./routes/upload')); // Upload doesn't need DB check
 app.use('/api/settings', dbHealthCheck, require('./routes/settings'));
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/api/health', (req, res) => {

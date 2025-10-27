@@ -39,9 +39,10 @@ router.post('/', protect, authorize('admin', 'editor'), upload.single('image'), 
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
       success: true,
-      url: `/uploads/${req.file.filename}`,
+      url: `${baseUrl}/uploads/${req.file.filename}`,
       filename: req.file.filename
     });
   } catch (error) {
