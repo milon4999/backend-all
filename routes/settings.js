@@ -25,6 +25,16 @@ router.get('/public', async (req, res) => {
         socialEnabled: settings.payments?.socialEnabled || false,
         stripePublicKey: settings.payments?.stripePublicKey || ''
       },
+      tax: {
+        enabled: settings.tax?.enabled ?? true,
+        rate: settings.tax?.rate ?? 10
+      },
+      shipping: {
+        methods: settings.shipping?.methods || {
+          standard: { enabled: true, name: 'Standard', price: 10, freeAbove: 50 },
+          express: { enabled: true, name: 'Express', price: 20, freeAbove: 0 }
+        }
+      },
       updatedAt: settings.updatedAt
     };
     res.json({ success: true, settings: payload });

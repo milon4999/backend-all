@@ -94,10 +94,25 @@ router.post('/', protect, async (req, res) => {
 
       subtotal += product.price * item.quantity;
 
+      // Choose image priority:
+      // 1) Provided by client (already color-specific from checkout)
+      // 2) Derived from variant color matched against product.images[].color (case-insensitive)
+      // 3) Fallback to product first image
+      const providedImage = item.image && String(item.image).trim() ? String(item.image).trim() : '';
+      let selectedColor = '';
+      if (typeof item.variant === 'string' && item.variant) {
+        // Extract color from variant string like "Color: Red, Size: M" or "color:red"
+        const m = item.variant.toLowerCase().match(/color\s*[:=]\s*([^,]+)/);
+        if (m && m[1]) selectedColor = m[1].trim();
+      }
+      const colorImageUrl = (Array.isArray(product.images) ? product.images : [])
+        .find(img => String(img?.color || '').toLowerCase() === selectedColor)?.url;
+      const finalImage = providedImage || colorImageUrl || product.images?.[0]?.url || '';
+
       orderItems.push({
         product: product._id,
         name: product.name,
-        image: product.images[0]?.url || '',
+        image: finalImage,
         price: product.price,
         currency: product.currency,
         quantity: item.quantity,
