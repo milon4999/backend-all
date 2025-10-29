@@ -139,27 +139,69 @@ const productSchema = new mongoose.Schema({
 });
 
 const makeSlug = (val) => {
-  const s = String(val || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  let s = String(val || '').toLowerCase();
+  
+  // Transliteration map for common non-English characters
+  const translitMap = {
+    'প্রি': 'pri',
+    'সিল': 'sil',
+    'পার্সেল': 'parcel',
+    'কালারা': 'kalara',
+    'শার্ট': 'shirt',
+    'টি': 'ti',
+    'পোশাক': 'poshak',
+    'জামা': 'jama',
+    'কাপড়': 'kapor'
+  };
+  
+  // Try to transliterate common words
+  Object.keys(translitMap).forEach(key => {
+    s = s.replace(new RegExp(key, 'g'), translitMap[key]);
+  });
+  
+  // Remove remaining non-alphanumeric characters and replace with hyphens
+  s = s.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  
+  // If slug is too short or empty, use a timestamp-based slug
+  if (!s || s.length < 3) {
+    s = 'product-' + Date.now().toString(36);
+  }
+  
   return s;
 };
 
 productSchema.pre('save', async function(next) {
-  const provided = this.slug && String(this.slug).trim();
-  if (!provided || this.isModified('name')) {
-    const base = provided || this.name;
+  // Generate/update slug if it's a new document, name has changed, or slug is modified
+  if (this.isNew || this.isModified('name') || this.isModified('slug')) {
+    // Use provided slug or generate from name
+    const base = this.slug || this.name;
     let s = makeSlug(base);
     
     if (s) {
-      // Check if slug exists and append random suffix if needed
+      // Check if slug exists and append incremental number if needed
       const existingProduct = await mongoose.model('Product').findOne({ 
         slug: s, 
         _id: { $ne: this._id } 
       });
       
       if (existingProduct) {
-        // Append random suffix to make it unique
-        const randomSuffix = Math.random().toString(36).substring(2, 8);
-        s = `${s}-${randomSuffix}`;
+        // Find all products with similar slugs to get the next number
+        const similarProducts = await mongoose.model('Product').find({
+          slug: new RegExp(`^${s}(-\\d+)?$`),
+          _id: { $ne: this._id }
+        }).select('slug');
+        
+        // Extract numbers from existing slugs
+        const numbers = similarProducts
+          .map(p => {
+            const match = p.slug.match(new RegExp(`^${s}-(\\d+)$`));
+            return match ? parseInt(match[1]) : 0;
+          })
+          .filter(n => n > 0);
+        
+        // Get the next number
+        const nextNumber = numbers.length > 0 ? Math.max(...numbers) + 1 : 2;
+        s = `${s}-${nextNumber}`;
       }
     }
     
@@ -170,44 +212,57 @@ productSchema.pre('save', async function(next) {
 
 productSchema.pre('findOneAndUpdate', async function(next) {
   const update = this.getUpdate() || {};
-  const hasTopLevel = Object.prototype.hasOwnProperty.call(update, 'name') || Object.prototype.hasOwnProperty.call(update, 'slug');
   const $set = update.$set || {};
   const $unset = update.$unset || {};
-  if (hasTopLevel || $set.name !== undefined || $set.slug !== undefined) {
-    const rawSlug = $set.slug !== undefined ? $set.slug : (update.slug !== undefined ? update.slug : undefined);
-    const rawName = $set.name !== undefined ? $set.name : (update.name !== undefined ? update.name : undefined);
-    const slugProvidedButEmpty = (rawSlug === '' || rawSlug === null);
-    const base = (rawSlug && String(rawSlug).trim()) || rawName;
-    if (slugProvidedButEmpty) {
-      // Explicitly unset slug when null/empty provided
+  
+  // Regenerate slug if name or slug is being updated
+  const nameIsBeingUpdated = $set.name !== undefined || update.name !== undefined;
+  const slugIsBeingUpdated = $set.slug !== undefined || update.slug !== undefined;
+  
+  if (nameIsBeingUpdated || slugIsBeingUpdated) {
+    // Use provided slug or generate from name
+    const providedSlug = $set.slug !== undefined ? $set.slug : update.slug;
+    const newName = $set.name !== undefined ? $set.name : update.name;
+    const base = providedSlug || newName;
+    let s = makeSlug(base);
+    
+    if (s) {
+      // Check if slug exists and append incremental number if needed
+      const currentDocId = this.getQuery()._id;
+      const existingProduct = await mongoose.model('Product').findOne({ 
+        slug: s, 
+        _id: { $ne: currentDocId } 
+      });
+      
+      if (existingProduct) {
+        // Find all products with similar slugs to get the next number
+        const similarProducts = await mongoose.model('Product').find({
+          slug: new RegExp(`^${s}(-\\d+)?$`),
+          _id: { $ne: currentDocId }
+        }).select('slug');
+        
+        // Extract numbers from existing slugs
+        const numbers = similarProducts
+          .map(p => {
+            const match = p.slug.match(new RegExp(`^${s}-(\\d+)$`));
+            return match ? parseInt(match[1]) : 0;
+          })
+          .filter(n => n > 0);
+        
+        // Get the next number
+        const nextNumber = numbers.length > 0 ? Math.max(...numbers) + 1 : 2;
+        s = `${s}-${nextNumber}`;
+      }
+      
+      $set.slug = s;
+      if (update.slug !== undefined) delete update.slug;
+    } else {
       $unset.slug = '';
       if ($set.slug !== undefined) delete $set.slug;
       if (update.slug !== undefined) delete update.slug;
-    } else if (base !== undefined) {
-      let s = makeSlug(base);
-      if (s) {
-        // Check if slug exists and append random suffix if needed
-        const currentDocId = this.getQuery()._id;
-        const existingProduct = await mongoose.model('Product').findOne({ 
-          slug: s, 
-          _id: { $ne: currentDocId } 
-        });
-        
-        if (existingProduct) {
-          // Append random suffix to make it unique
-          const randomSuffix = Math.random().toString(36).substring(2, 8);
-          s = `${s}-${randomSuffix}`;
-        }
-        
-        $set.slug = s;
-        if (update.slug !== undefined) delete update.slug;
-      } else {
-        $unset.slug = '';
-        if ($set.slug !== undefined) delete $set.slug;
-        if (update.slug !== undefined) delete update.slug;
-      }
     }
   }
+  
   if (Object.keys($set).length) update.$set = $set; else delete update.$set;
   if (Object.keys($unset).length) update.$unset = $unset; else delete update.$unset;
   this.setUpdate(update);
