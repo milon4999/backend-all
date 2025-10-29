@@ -81,7 +81,24 @@ const productSchema = new mongoose.Schema({
     freeShipping: {
       type: Boolean,
       default: false
-    }
+    },
+    freeShippingThreshold: {
+      type: Number,
+      default: 50
+    },
+    standardDelivery: {
+      type: String,
+      default: '3-5 business days'
+    },
+    expressDelivery: {
+      type: String,
+      default: '1-2 business days (additional charges apply)'
+    },
+    internationalShipping: {
+      type: Boolean,
+      default: true
+    },
+    shippingNotes: String
   },
   seo: {
     metaTitle: String,
