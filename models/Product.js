@@ -126,17 +126,32 @@ const makeSlug = (val) => {
   return s;
 };
 
-productSchema.pre('save', function(next) {
+productSchema.pre('save', async function(next) {
   const provided = this.slug && String(this.slug).trim();
   if (!provided || this.isModified('name')) {
     const base = provided || this.name;
-    const s = makeSlug(base);
+    let s = makeSlug(base);
+    
+    if (s) {
+      // Check if slug exists and append random suffix if needed
+      const existingProduct = await mongoose.model('Product').findOne({ 
+        slug: s, 
+        _id: { $ne: this._id } 
+      });
+      
+      if (existingProduct) {
+        // Append random suffix to make it unique
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        s = `${s}-${randomSuffix}`;
+      }
+    }
+    
     this.slug = s || undefined;
   }
   next();
 });
 
-productSchema.pre('findOneAndUpdate', function(next) {
+productSchema.pre('findOneAndUpdate', async function(next) {
   const update = this.getUpdate() || {};
   const hasTopLevel = Object.prototype.hasOwnProperty.call(update, 'name') || Object.prototype.hasOwnProperty.call(update, 'slug');
   const $set = update.$set || {};
@@ -152,8 +167,21 @@ productSchema.pre('findOneAndUpdate', function(next) {
       if ($set.slug !== undefined) delete $set.slug;
       if (update.slug !== undefined) delete update.slug;
     } else if (base !== undefined) {
-      const s = makeSlug(base);
+      let s = makeSlug(base);
       if (s) {
+        // Check if slug exists and append random suffix if needed
+        const currentDocId = this.getQuery()._id;
+        const existingProduct = await mongoose.model('Product').findOne({ 
+          slug: s, 
+          _id: { $ne: currentDocId } 
+        });
+        
+        if (existingProduct) {
+          // Append random suffix to make it unique
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          s = `${s}-${randomSuffix}`;
+        }
+        
         $set.slug = s;
         if (update.slug !== undefined) delete update.slug;
       } else {
