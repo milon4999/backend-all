@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Review = require('../models/Review');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
 const { protect } = require('../middleware/auth');
 
 // @route   GET /api/reviews/product/:productId
@@ -39,6 +40,46 @@ router.get('/product/:productId', async (req, res) => {
   }
 });
 
+// @route   GET /api/reviews/product/:productId/eligibility
+// @desc    Check if authenticated user can review a product
+// @access  Private
+router.get('/product/:productId/eligibility', protect, async (req, res) => {
+  try {
+    const productId = req.params.productId;
+
+    const hasPurchased = await Order.exists({
+      user: req.user.id,
+      'items.product': productId,
+      status: { $in: ['shipped', 'delivered'] }
+    });
+
+    if (!hasPurchased) {
+      return res.json({
+        success: true,
+        canReview: false,
+        message: 'Only customers who purchased this product can leave a review.'
+      });
+    }
+
+    const existingReview = await Review.exists({
+      product: productId,
+      user: req.user.id
+    });
+
+    if (existingReview) {
+      return res.json({
+        success: true,
+        canReview: false,
+        message: 'You have already reviewed this product.'
+      });
+    }
+
+    return res.json({ success: true, canReview: true, message: '' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/reviews
 // @desc    Create a review
 // @access  Private
@@ -59,13 +100,27 @@ router.post('/', protect, async (req, res) => {
       });
     }
 
+    const hasPurchased = await Order.exists({
+      user: req.user.id,
+      'items.product': product,
+      status: { $in: ['shipped', 'delivered'] }
+    });
+
+    if (!hasPurchased) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only customers who purchased this product can leave a review'
+      });
+    }
+
     const review = await Review.create({
       product,
       user: req.user.id,
       rating,
       title,
       comment,
-      images
+      images,
+      verified: true
     });
 
     // Update product ratings
