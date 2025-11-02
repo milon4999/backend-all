@@ -247,6 +247,12 @@ router.put('/:id/cancel', protect, async (req, res) => {
     if (order.status === 'cancelled') {
       return res.json({ success: true, order });
     }
+    if (order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending orders can be cancelled by the customer'
+      });
+    }
 
     for (const it of order.items) {
       const p = await Product.findById(it.product._id || it.product);
